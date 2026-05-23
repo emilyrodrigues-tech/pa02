@@ -1,6 +1,6 @@
-// Winter'24
+//Spring'26
 // Instructor: Diba Mirza
-// Student name: 
+// Student name: Emily Rodrigues
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -13,6 +13,7 @@
 #include <set>
 #include <queue>
 #include <sstream>
+#include <map>
 using namespace std;
 
 #include "utilities.h"
@@ -35,6 +36,8 @@ int main(int argc, char** argv){
     }
   
     // Create an object of a STL data-structure to store all the movies
+    map<string, double> movieMap; // keeps movies sorted alphabetically
+    MovieTrie trie;               // used for prefix search in part 2
 
     string line, movieName;
     double movieRating;
@@ -44,12 +47,16 @@ int main(int argc, char** argv){
             // to construct your Movie objects
             // cout << movieName << " has rating " << movieRating << endl;
             // insert elements into your data structure
+            movieMap[movieName] = movieRating;
+            trie.insert(movieName, movieRating);
     }
 
     movieFile.close();
 
     if (argc == 2){
             //print all the movies in ascending alphabetical order of movie names
+            for (auto& [name, rating] : movieMap)
+                cout << name << ", " << fixed << setprecision(1) << rating << "\n";
             return 0;
     }
 
@@ -66,20 +73,69 @@ int main(int argc, char** argv){
             prefixes.push_back(line);
         }
     }
+    prefixFile.close();
 
-    //  For each prefix,
-    //  Find all movies that have that prefix and store them in an appropriate data structure
-    //  If no movie with that prefix exists print the following message
-    cout << "No movies found with prefix "<<"<replace with prefix>" << endl;
+    // store the best movie for each prefix (only when matches exist)
+    vector<pair<string, Movie>> bestMovies;
+
+    for (auto& prefix : prefixes) {
+        //  For each prefix,
+        //  Find all movies that have that prefix and store them in an appropriate data structure
+        vector<Movie> matches = trie.search(prefix);
+
+        //  If no movie with that prefix exists print the following message
+        if (matches.empty()) {
+            cout << "No movies found with prefix " << prefix << "\n";
+        } else {
+            // print all matches sorted by rating desc, then alphabetically
+            for (auto& m : matches)
+                cout << m.name << ", " << fixed << setprecision(1) << m.rating << "\n";
+            cout << "\n";
+            bestMovies.push_back({prefix, matches[0]});
+        }
+    }
 
     //  For each prefix,
     //  Print the highest rated movie with that prefix if it exists.
-    cout << "Best movie with prefix " << "<replace with prefix>" << " is: " << "replace with movie name" << " with rating " << std::fixed << std::setprecision(1) << "replace with movie rating" << endl;
+    for (auto& [prefix, m] : bestMovies)
+        cout << "Best movie with prefix " << prefix << " is: "
+             << m.name << " with rating "
+             << fixed << setprecision(1) << m.rating << "\n";
 
     return 0;
 }
 
-/* Add your run time analysis for part 3 of the assignment here as commented block*/
+/*
+ * runtime analysis
+ *
+ * variables:
+ *   n = number of movies in the dataset
+ *   m = number of prefixes
+ *   k = max number of movies that match a single prefix
+ *   l = max number of characters in a movie name
+ *
+ * time complexity:
+ * I used a trie for the prefix search. for each of the m prefixes:
+ *   - walk down the trie to the prefix node: O(l)
+ *   - collect all k matching movies with a DFS: O(k)
+ *   - sort those k movies by rating then name: O(k log k)
+ * so each prefix takes O(l + k log k), and for all m prefixes
+ * the total is O(m * (l + k log k))
+ *
+ * space complexity:
+ * in the worst case the trie has O(n * l) nodes (if no two movie names
+ * share any prefix). each node has a fixed 128-pointer array plus one
+ * Movie pointer. the result vector for each query is O(k) temporary space.
+ * overall: O(n * l)
+ *
+ * tradeoffs:
+ * I focused on keeping the time complexity low. the trie lets me go straight
+ * to the right prefix node in O(l) instead of scanning all n movies each time.
+ * the downside is memory -- every node allocates 128 pointers even if most
+ * of them are null, so the constant factor on O(n*l) is pretty large. a radix
+ * trie would fix that but it's a lot more code. since the priority here was
+ * runtime I just went with the simpler version and accepted the extra memory.
+ */
 
 bool parseLine(string &line, string &movieName, double &movieRating) {
     int commaIndex = line.find_last_of(",");
